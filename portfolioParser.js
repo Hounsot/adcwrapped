@@ -153,6 +153,7 @@ class PortfolioParser {
           coverImageUrl: project.coverImageUrl,
           groupName: project.groupName,
           courseNum: project.courseNum,
+          views: project.views || 0,
           hseDesignLikes: 0,
           hasHseDesignLink: false,
           authors: project.authors || [],
@@ -212,6 +213,7 @@ class PortfolioParser {
     const totalProjects = projects.length;
     const projectsWithHseDesign = projects.filter(p => p.hasHseDesignLink).length;
     const totalLikes = projects.reduce((sum, p) => sum + p.hseDesignLikes, 0);
+    const totalViews = projects.reduce((sum, p) => sum + (p.views || 0), 0);
     const averageMark = projects.reduce((sum, p) => sum + p.totalMark, 0) / totalProjects;
     const averageRating = projects.reduce((sum, p) => sum + p.rating, 0) / totalProjects;
     
@@ -261,6 +263,7 @@ class PortfolioParser {
       totalProjects,
       projectsWithHseDesign,
       totalLikes,
+      totalViews,
       averageMark: Math.round(averageMark * 100) / 100,
       averageRating: Math.round(averageRating * 100) / 100,
       markDistribution,
@@ -271,6 +274,7 @@ class PortfolioParser {
       totalTeamMembers: totalTeamMembers,
       uniqueTeammates: uniqueTeammates.size,
       teammatesList: teammatesList,
+      teammatesArray: teammatesArray, // Массив имен для ImageGenerator
       averageTeamSize: teamProjects.length > 0 ? 
         Math.round((teamProjects.reduce((sum, p) => sum + p.teamSize, 0) / teamProjects.length) * 10) / 10 : 0,
       bestProject: projects.reduce((best, current) => 

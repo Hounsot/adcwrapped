@@ -133,7 +133,65 @@ class ImageGenerator {
     await this.renderToImage(bestProjectsHTML, bestProjectsPath);
     images.push(bestProjectsPath);
     
+    // Слайд 4: Общее количество лайков (если есть лайки)
+    if (studentData.statistics.totalLikes > 0) {
+      const likesData = {
+        totalLikes: studentData.statistics.totalLikes
+      };
+      
+      const likesHTML = this.generateHTML('likes', likesData);
+      const likesPath = path.join(this.outputDir, `stats-likes-${timestamp}.png`);
+      await this.renderToImage(likesHTML, likesPath);
+      images.push(likesPath);
+    }
+    
+    // Слайд 5: Общее количество просмотров (если есть просмотры)
+    if (studentData.statistics.totalViews > 0) {
+      const viewsData = {
+        totalViews: studentData.statistics.totalViews
+      };
+      
+      const viewsHTML = this.generateHTML('views', viewsData);
+      const viewsPath = path.join(this.outputDir, `stats-views-${timestamp}.png`);
+      await this.renderToImage(viewsHTML, viewsPath);
+      images.push(viewsPath);
+    }
+    
+    // Слайд 6: Коллаборации (если есть командные проекты)
+    if (studentData.statistics.teamProjects > 0 && studentData.statistics.uniqueTeammates > 0) {
+      const collabsData = {
+        totalCollabs: studentData.statistics.uniqueTeammates,
+        teammatesList: this.formatTeammatesList(studentData.statistics.teammatesArray)
+      };
+      
+      const collabsHTML = this.generateHTML('collabs', collabsData);
+      const collabsPath = path.join(this.outputDir, `stats-collabs-${timestamp}.png`);
+      await this.renderToImage(collabsHTML, collabsPath);
+      images.push(collabsPath);
+    }
+    
     return images;
+  }
+
+  /**
+   * Форматирует список товарищей по команде для отображения
+   * @param {Array} teammatesList - Массив имен товарищей по команде
+   * @returns {string} Отформатированная строка
+   */
+  formatTeammatesList(teammatesList) {
+    if (!teammatesList || teammatesList.length === 0) {
+      return 'с коллегами из ВШЭ';
+    }
+    
+    // Берем первых 3-4 имени для отображения
+    const displayNames = teammatesList.slice(0, 3);
+    let result = displayNames.join(', ');
+    
+    if (teammatesList.length > 4) {
+      result += ` и еще ${teammatesList.length - 4}`;
+    }
+    
+    return `с ${result}`;
   }
 }
 

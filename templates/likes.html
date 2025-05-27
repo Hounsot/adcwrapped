@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HSE Best Projects</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Manrope', sans-serif;
+        }
+        .SO_Frame{
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            width: 1080px;
+            max-width: 1080px;
+            max-height: 1920px;
+            height: 1920px;
+            overflow: hidden;
+            background: url("https://mattee.ru/images/BG/Q_BG01.jpg") no-repeat center center;
+            background-size: cover;
+            color: white;
+            padding: 96px 48px;
+        }  
+        .O_Footer{
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            font-weight: 400;
+            text-align: center;
+            border-radius: 36px;
+            border: 1px solid rgba(255, 255, 255, 0.20);
+            background: rgba(255, 255, 255, 0.10);
+            backdrop-filter: blur(2.5px);
+            padding: 9px 18px;
+            height: 74px;
+        }      
+        .A_Logo{
+            width: 214px;
+            height: 74px;
+        }
+        .O_Container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            width: 100vw;
+            height: 100vh;
+            padding: 216px 48px;
+            overflow: hidden;
+        }
+        .M_MainStat{
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            align-items: center;
+            gap: 24px;
+            width: 100%;
+            height: 100%;
+        }
+        .M_MainStat_Number{
+            font-size: 288px;
+            font-weight: 800;
+            line-height: 85%;
+            letter-spacing: -20.16px;
+        }
+        .M_MainStat_Text{
+            font-size: 140px;
+            font-weight: 800;
+            line-height: 1.1;
+            letter-spacing: -8.4px;
+        }
+        .A_Descriptor{
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            height: 180px;
+            font-size: 36px;
+        }
+    </style>
+</head>
+<body class="SO_Frame">
+    <img class="A_Logo" src="https://mattee.ru/images/BG/Q_Logo.svg" alt="">
+        <div class="O_Container">
+            <div class="A_Descriptor">
+            </div>
+            <div class="M_MainStat">
+                <p class="M_MainStat_Number">{{totalLikes}}</p>
+                <p class="M_MainStat_Text">лайков</p>
+            </div>
+            <div class="A_Descriptor">
+                на всех твоих проектах в новом портфолио
+            </div>
+        </div>
+    <div class="O_Footer">
+        @adchubbot
+    </div>
+</body>
+</html> 
