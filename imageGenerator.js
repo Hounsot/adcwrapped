@@ -10,6 +10,32 @@ class ImageGenerator {
   }
 
   /**
+   * Склоняет русские слова в зависимости от числа
+   * @param {number} count - Количество
+   * @param {Array} forms - Массив форм [1, 2-4, 5+] например: ['лайк', 'лайка', 'лайков']
+   * @returns {string} Правильная форма слова
+   */
+  pluralize(count, forms) {
+    const n = Math.abs(count);
+    const n10 = n % 10;
+    const n100 = n % 100;
+    
+    if (n100 >= 11 && n100 <= 19) {
+      return forms[2]; // 11-19: лайков, просмотров, коллабораций
+    }
+    
+    if (n10 === 1) {
+      return forms[0]; // 1, 21, 31...: лайк, просмотр, коллаборация
+    }
+    
+    if (n10 >= 2 && n10 <= 4) {
+      return forms[1]; // 2-4, 22-24...: лайка, просмотра, коллаборации
+    }
+    
+    return forms[2]; // 0, 5-20, 25-30...: лайков, просмотров, коллабораций
+  }
+
+  /**
    * Инициализация браузера
    */
   async init() {
@@ -90,53 +116,34 @@ class ImageGenerator {
     const images = [];
     const timestamp = Date.now();
     
-    // Слайд 1: Основная статистика
-    const mainStatsData = {
-      studentName: studentData.studentName,
-      totalProjects: studentData.statistics.totalProjects,
-      averageMark: studentData.statistics.averageMark.toFixed(1),
-      totalLikes: studentData.statistics.totalLikes,
-      projectsWithHseDesign: studentData.statistics.projectsWithHseDesign
+    // Слайд 0: Приветствие
+    const welcomeData = {
+      studentName: studentData.studentName
     };
     
-    const mainStatsHTML = this.generateHTML('main-stats', mainStatsData);
-    const mainStatsPath = path.join(this.outputDir, `stats-main-${timestamp}.png`);
-    await this.renderToImage(mainStatsHTML, mainStatsPath);
-    images.push(mainStatsPath);
+    const welcomeHTML = this.generateHTML('welcome', welcomeData);
+    const welcomePath = path.join(this.outputDir, `stats-welcome-${timestamp}.png`);
+    await this.renderToImage(welcomeHTML, welcomePath);
+    images.push(welcomePath);
     
-    // Слайд 2: Командная работа (если есть групповые проекты)
-    if (studentData.statistics.teamProjects > 0) {
-      const teamStatsData = {
-        studentName: studentData.studentName,
-        teamProjects: studentData.statistics.teamProjects,
-        teammatesList: studentData.statistics.teammatesList,
-        uniqueTeammates: studentData.statistics.uniqueTeammates
-      };
+    // Слайд 1: Самая высокая оценка
+    if (studentData.projects && studentData.projects.length > 0) {
+      const highestData = this.calculateMarkStatistics(studentData.projects);
       
-      const teamStatsHTML = this.generateHTML('team-stats', teamStatsData);
-      const teamStatsPath = path.join(this.outputDir, `stats-team-${timestamp}.png`);
-      await this.renderToImage(teamStatsHTML, teamStatsPath);
-      images.push(teamStatsPath);
+      // Генерируем слайд только если есть оценки
+      if (highestData.highestMark > 0) {
+        const highestHTML = this.generateHTML('highest', highestData);
+        const highestPath = path.join(this.outputDir, `stats-highest-${timestamp}.png`);
+        await this.renderToImage(highestHTML, highestPath);
+        images.push(highestPath);
+      }
     }
     
-    // Слайд 3: Лучшие проекты
-    const bestProjectsData = {
-      studentName: studentData.studentName,
-      bestProjectTitle: studentData.statistics.bestProject.title,
-      bestProjectMark: studentData.statistics.bestProject.totalMark,
-      mostLikedProjectTitle: studentData.statistics.mostLikedProject.title,
-      mostLikedProjectLikes: studentData.statistics.mostLikedProject.hseDesignLikes
-    };
-    
-    const bestProjectsHTML = this.generateHTML('best-projects', bestProjectsData);
-    const bestProjectsPath = path.join(this.outputDir, `stats-projects-${timestamp}.png`);
-    await this.renderToImage(bestProjectsHTML, bestProjectsPath);
-    images.push(bestProjectsPath);
-    
-    // Слайд 4: Общее количество лайков (если есть лайки)
+    // Слайд 2: Общее количество лайков (если есть лайки)
     if (studentData.statistics.totalLikes > 0) {
       const likesData = {
-        totalLikes: studentData.statistics.totalLikes
+        totalLikes: studentData.statistics.totalLikes,
+        likesWord: this.pluralize(studentData.statistics.totalLikes, ['лайк', 'лайка', 'лайков'])
       };
       
       const likesHTML = this.generateHTML('likes', likesData);
@@ -145,10 +152,11 @@ class ImageGenerator {
       images.push(likesPath);
     }
     
-    // Слайд 5: Общее количество просмотров (если есть просмотры)
+    // Слайд 3: Общее количество просмотров (если есть просмотры)
     if (studentData.statistics.totalViews > 0) {
       const viewsData = {
-        totalViews: studentData.statistics.totalViews
+        totalViews: studentData.statistics.totalViews,
+        viewsWord: this.pluralize(studentData.statistics.totalViews, ['просмотр', 'просмотра', 'просмотров'])
       };
       
       const viewsHTML = this.generateHTML('views', viewsData);
@@ -157,10 +165,11 @@ class ImageGenerator {
       images.push(viewsPath);
     }
     
-    // Слайд 6: Коллаборации (если есть командные проекты)
+    // Слайд 4: Коллаборации (если есть командные проекты)
     if (studentData.statistics.teamProjects > 0 && studentData.statistics.uniqueTeammates > 0) {
       const collabsData = {
         totalCollabs: studentData.statistics.uniqueTeammates,
+        collabsWord: this.pluralize(studentData.statistics.uniqueTeammates, ['коллаборация', 'коллаборации', 'коллабораций']),
         teammatesList: this.formatTeammatesList(studentData.statistics.teammatesArray)
       };
       
@@ -174,24 +183,72 @@ class ImageGenerator {
   }
 
   /**
+   * Рассчитывает статистику по оценкам
+   * @param {Array} projects - Массив проектов студента
+   * @returns {Object} Статистика по оценкам
+   */
+  calculateMarkStatistics(projects) {
+    const marks = projects.map(p => p.totalMark).filter(mark => mark && mark > 0);
+    
+    if (marks.length === 0) {
+      return {
+        highestMark: 0,
+        count10: 0,
+        count9: 0,
+        count8: 0,
+        percent10: 0,
+        percent9: 0,
+        percent8: 0
+      };
+    }
+    
+    const highestMark = Math.max(...marks);
+    const count10 = marks.filter(mark => mark === 10).length;
+    const count9 = marks.filter(mark => mark === 9).length;
+    const count8 = marks.filter(mark => mark === 8).length;
+    
+    const total = marks.length;
+    const percent10 = total > 0 ? Math.round((count10 / total) * 100) : 0;
+    const percent9 = total > 0 ? Math.round((count9 / total) * 100) : 0;
+    const percent8 = total > 0 ? Math.round((count8 / total) * 100) : 0;
+    
+    return {
+      highestMark,
+      count10,
+      count9,
+      count8,
+      percent10,
+      percent9,
+      percent8
+    };
+  }
+
+  /**
    * Форматирует список товарищей по команде для отображения
    * @param {Array} teammatesList - Массив имен товарищей по команде
-   * @returns {string} Отформатированная строка
+   * @returns {string} HTML с отдельными <p> элементами
    */
   formatTeammatesList(teammatesList) {
     if (!teammatesList || teammatesList.length === 0) {
-      return 'с коллегами из ВШЭ';
+      return '<p>с ребятами из ВШЭ</p>';
     }
     
-    // Берем первых 3-4 имени для отображения
+    let html = '';
+    
+    // Показываем первых 3 товарищей
     const displayNames = teammatesList.slice(0, 3);
-    let result = displayNames.join(', ');
+    displayNames.forEach(name => {
+      html += `<p>${name}</p>`;
+    });
     
-    if (teammatesList.length > 4) {
-      result += ` и еще ${teammatesList.length - 4}`;
+    // Если товарищей больше 3, добавляем "и еще X" с правильным склонением
+    if (teammatesList.length > 3) {
+      const remaining = teammatesList.length - 3;
+      const remainingWord = this.pluralize(remaining, ['человек', 'человека', 'человек']);
+      html += `<p class="U_Last">и еще ${remaining} ${remainingWord}</p>`;
     }
     
-    return `с ${result}`;
+    return html;
   }
 }
 

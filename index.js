@@ -2,6 +2,7 @@ require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const PortfolioParser = require('./portfolioParser');
 const ImageGenerator = require('./imageGenerator');
+const UserLogger = require('./userLogger');
 const fs = require('fs');
 const path = require('path');
 
@@ -9,6 +10,7 @@ const path = require('path');
 const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
 const parser = new PortfolioParser();
 const imageGenerator = new ImageGenerator();
+const userLogger = new UserLogger();
 
 
 
@@ -16,6 +18,9 @@ const imageGenerator = new ImageGenerator();
 bot.onText(/\/start/, async (msg) => {
     const chatId = msg.chat.id;
     const user = msg.from;
+    
+    // Логируем старт бота
+    userLogger.logStart(user, chatId);
     
     // Формируем обращение к пользователю
     let greeting = "Добро пожаловать";
@@ -61,6 +66,168 @@ bot.onText(/\/start/, async (msg) => {
     }
 });
 
+// Функция проверки прав администратора
+function isAdmin(userId) {
+    const adminIds = [process.env.ADMIN_ID]; // Можно добавить несколько ID через запятую
+    return adminIds.includes(userId.toString());
+}
+
+// Команда /stats (только для администраторов)
+bot.onText(/\/stats/, async (msg) => {
+    const chatId = msg.chat.id;
+    const user = msg.from;
+    
+    if (!isAdmin(user.id)) {
+        await bot.sendMessage(chatId, '❌ У вас нет прав для просмотра статистики.');
+        return;
+    }
+    
+    try {
+        const stats = userLogger.formatStats();
+        await bot.sendMessage(chatId, stats);
+    } catch (error) {
+        console.error('Ошибка при получении статистики:', error);
+        await bot.sendMessage(chatId, '❌ Ошибка при получении статистики.');
+    }
+});
+
+// Команда /broadcast (только для администраторов)
+bot.onText(/\/broadcast (.+)/, async (msg, match) => {
+    const chatId = msg.chat.id;
+    const user = msg.from;
+    const message = match[1];
+    
+    if (!isAdmin(user.id)) {
+        await bot.sendMessage(chatId, '❌ У вас нет прав для рассылки.');
+        return;
+    }
+    
+    try {
+        // Получаем всех пользователей
+        const users = userLogger.getUsersForBroadcast();
+        
+        if (users.length === 0) {
+            await bot.sendMessage(chatId, '📭 Нет пользователей для рассылки.');
+            return;
+        }
+        
+        // Подтверждение рассылки
+        const confirmMsg = await bot.sendMessage(chatId, 
+            `📢 Готов отправить сообщение ${users.length} пользователям:\n\n"${message}"\n\n` +
+            `Отправьте "ДА" для подтверждения или любое другое сообщение для отмены.`
+        );
+        
+        // Ждем подтверждения
+        const confirmHandler = async (confirmMsg) => {
+            if (confirmMsg.chat.id !== chatId || confirmMsg.from.id !== user.id) return;
+            
+            bot.removeListener('message', confirmHandler);
+            
+            if (confirmMsg.text?.toUpperCase() === 'ДА') {
+                await sendBroadcast(chatId, message, users, 'manual');
+            } else {
+                await bot.sendMessage(chatId, '❌ Рассылка отменена.');
+            }
+        };
+        
+        bot.on('message', confirmHandler);
+        
+        // Автоматическая отмена через 30 секунд
+        setTimeout(() => {
+            bot.removeListener('message', confirmHandler);
+        }, 30000);
+        
+    } catch (error) {
+        console.error('Ошибка при подготовке рассылки:', error);
+        await bot.sendMessage(chatId, '❌ Ошибка при подготовке рассылки.');
+    }
+});
+
+// Команда /broadcast_active (только для администраторов) - рассылка активным пользователям
+bot.onText(/\/broadcast_active (.+)/, async (msg, match) => {
+    const chatId = msg.chat.id;
+    const user = msg.from;
+    const message = match[1];
+    
+    if (!isAdmin(user.id)) {
+        await bot.sendMessage(chatId, '❌ У вас нет прав для рассылки.');
+        return;
+    }
+    
+    try {
+        // Получаем активных пользователей за последние 7 дней
+        const users = userLogger.getActiveUsers(7);
+        
+        if (users.length === 0) {
+            await bot.sendMessage(chatId, '📭 Нет активных пользователей для рассылки.');
+            return;
+        }
+        
+        await bot.sendMessage(chatId, 
+            `📢 Отправляю сообщение ${users.length} активным пользователям (за последние 7 дней)...`
+        );
+        
+        await sendBroadcast(chatId, message, users, 'active_users');
+        
+    } catch (error) {
+        console.error('Ошибка при рассылке активным пользователям:', error);
+        await bot.sendMessage(chatId, '❌ Ошибка при рассылке.');
+    }
+});
+
+// Функция отправки рассылки
+async function sendBroadcast(adminChatId, message, users, broadcastType) {
+    let sentCount = 0;
+    let failedCount = 0;
+    
+    const progressMsg = await bot.sendMessage(adminChatId, 
+        `📤 Отправка: 0/${users.length} (0%)`
+    );
+    
+    for (let i = 0; i < users.length; i++) {
+        const user = users[i];
+        
+        try {
+            await bot.sendMessage(user.chatId, message);
+            sentCount++;
+        } catch (error) {
+            console.error(`Ошибка отправки пользователю ${user.chatId}:`, error.message);
+            failedCount++;
+        }
+        
+        // Обновляем прогресс каждые 10 сообщений или в конце
+        if ((i + 1) % 10 === 0 || i === users.length - 1) {
+            const progress = Math.round(((i + 1) / users.length) * 100);
+            try {
+                await bot.editMessageText(
+                    `📤 Отправка: ${i + 1}/${users.length} (${progress}%)\n✅ Успешно: ${sentCount}\n❌ Ошибок: ${failedCount}`,
+                    {
+                        chat_id: adminChatId,
+                        message_id: progressMsg.message_id
+                    }
+                );
+            } catch (editError) {
+                // Игнорируем ошибки редактирования
+            }
+        }
+        
+        // Небольшая задержка между отправками
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    // Логируем рассылку
+    userLogger.logBroadcast(broadcastType, sentCount, users.length);
+    
+    // Финальное сообщение
+    await bot.sendMessage(adminChatId, 
+        `✅ Рассылка завершена!\n\n📊 Статистика:\n` +
+        `👥 Всего пользователей: ${users.length}\n` +
+        `✅ Успешно отправлено: ${sentCount}\n` +
+        `❌ Ошибок: ${failedCount}\n` +
+        `📈 Успешность: ${((sentCount / users.length) * 100).toFixed(1)}%`
+    );
+}
+
 // Обработка текстовых сообщений
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
@@ -94,6 +261,9 @@ https://portfolio.hse.ru/Student/XXXXX
     `);
     
     try {
+        // Логируем запрос портфолио
+        userLogger.logPortfolioRequest(msg.from, text);
+        
         // Парсим данные портфолио
         console.log(`Начинаю парсинг портфолио: ${text}`);
         const studentData = await parser.parseStudentData(text);
@@ -118,8 +288,24 @@ https://portfolio.hse.ru/Student/XXXXX
             images = await imageGenerator.generateStudentStats(studentData);
         } catch (imageError) {
             console.error('Ошибка при генерации изображений:', imageError);
-            // Отправляем только текстовую статистику, если изображения не удалось создать
-            await bot.sendMessage(chatId, '⚠️ Не удалось создать изображения, но вот ваша статистика:');
+            // Логируем ошибку генерации изображений
+            userLogger.logFailedRequest(msg.from, 'image_generation_error');
+            // Если изображения не удалось создать, сообщаем об ошибке
+            await bot.sendMessage(chatId, '⚠️ Не удалось создать изображения. Попробуйте еще раз позже.');
+            
+            // Очищаем частично созданные файлы при ошибке
+            if (images && images.length > 0) {
+                for (const imagePath of images) {
+                    try {
+                        if (fs.existsSync(imagePath)) {
+                            fs.unlinkSync(imagePath);
+                            console.log(`Удален частично созданный файл: ${path.basename(imagePath)}`);
+                        }
+                    } catch (deleteError) {
+                        console.error(`Ошибка удаления файла ${imagePath}:`, deleteError.message);
+                    }
+                }
+            }
         }
         
         // Удаляем сообщение о процессе
@@ -134,33 +320,54 @@ https://portfolio.hse.ru/Student/XXXXX
             const mediaGroup = images.map((imagePath, index) => ({
                 type: 'photo',
                 media: fs.createReadStream(imagePath),
-                caption: index === 0 ? '🎓 Твоя статистика HSE Portfolio Wrapped' : undefined
+                caption: index === 0 ? '🎓 Твоя статистика HSE Wrapped' : undefined
             }));
             
             try {
                 await bot.sendMediaGroup(chatId, mediaGroup);
+                // Логируем успешную отправку
+                userLogger.logSuccessfulRequest(msg.from, images.length, studentData);
             } catch (mediaError) {
                 console.error('Ошибка при отправке media group:', mediaError);
                 // Отправляем изображения по отдельности как fallback
+                let sentImages = 0;
                 for (const imagePath of images) {
                     try {
                         await bot.sendPhoto(chatId, fs.createReadStream(imagePath), {
                             filename: path.basename(imagePath),
                             contentType: 'image/png'
                         });
+                        sentImages++;
                     } catch (photoError) {
                         console.error('Ошибка при отправке фото:', photoError);
                     }
                 }
+                // Логируем успешную отправку (хотя бы частичную)
+                if (sentImages > 0) {
+                    userLogger.logSuccessfulRequest(msg.from, sentImages, studentData);
+                }
+            }
+            
+            // Удаляем временные файлы после отправки
+            for (const imagePath of images) {
+                try {
+                    if (fs.existsSync(imagePath)) {
+                        fs.unlinkSync(imagePath);
+                        console.log(`Удален временный файл: ${path.basename(imagePath)}`);
+                    }
+                } catch (deleteError) {
+                    console.error(`Ошибка удаления файла ${imagePath}:`, deleteError.message);
+                }
             }
         }
         
-        // Отправляем текстовую статистику как дополнение
-        const statsMessage = formatStudentStats(studentData);
-        await bot.sendMessage(chatId, `📊 Подробная статистика:\n\n${statsMessage}`, { parse_mode: 'HTML' });
+        // Текстовая статистика убрана - отправляем только изображения
         
     } catch (error) {
         console.error('Ошибка при парсинге:', error);
+        
+        // Логируем ошибку парсинга
+        userLogger.logFailedRequest(msg.from, 'parsing_error');
         
         try {
             await bot.editMessageText(`
@@ -192,51 +399,7 @@ https://portfolio.hse.ru/Student/XXXXX
     }
 });
 
-// Функция форматирования статистики
-function formatStudentStats(data) {
-    const stats = data.statistics;
-    
-    let message = `
-🎓 <b>${data.studentName}</b>
-
-📊 <b>СТАТИСТИКА ПОРТФОЛИО</b>
-
-🗂️ <b>Проекты:</b> ${stats.totalProjects}
-🎨 <b>На HseDesign:</b> ${stats.projectsWithHseDesign}
-⭐ <b>Средняя оценка:</b> ${stats.averageMark.toFixed(1)}
-📈 <b>Средний рейтинг:</b> ${stats.averageRating.toFixed(1)}
-❤️ <b>Общие лайки:</b> ${stats.totalLikes}
-
-🤝 <b>Групповые проекты:</b> ${stats.teamProjects}
-${stats.teammatesList ? `👥 <b>Соавторы:</b> ${stats.teammatesList}` : ''}
-
-🏆 <b>ЛУЧШИЙ ПРОЕКТ</b>
-${stats.bestProject.title}
-Оценка: ${stats.bestProject.totalMark} | Рейтинг: ${stats.bestProject.rating}
-`;
-
-    if (stats.mostLikedProject && stats.mostLikedProject.hseDesignLikes > 0) {
-        message += `
-🔥 <b>САМЫЙ ПОПУЛЯРНЫЙ</b>
-${stats.mostLikedProject.title}
-❤️ ${stats.mostLikedProject.hseDesignLikes} лайков
-`;
-    }
-
-    // Добавляем распределение по оценкам
-    message += `
-📊 <b>РАСПРЕДЕЛЕНИЕ ОЦЕНОК</b>
-`;
-    
-    Object.entries(stats.markDistribution)
-        .sort(([a], [b]) => parseInt(b) - parseInt(a))
-        .forEach(([grade, count]) => {
-            const percentage = ((count / stats.totalProjects) * 100).toFixed(1);
-            message += `${grade} баллов: ${count} (${percentage}%)\n`;
-        });
-
-    return message;
-}
+// Функция formatStudentStats удалена - теперь отправляем только изображения
 
 // Обработка ошибок
 bot.on('error', (error) => {

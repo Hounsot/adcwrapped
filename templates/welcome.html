@@ -23,7 +23,7 @@
             max-height: 1920px;
             height: 1920px;
             overflow: hidden;
-            background: url("https://mattee.ru/images/NEWBG/Q_BGP03.jpg") no-repeat center center;
+            background: url("https://mattee.ru/images/NEWBG/Q_BGG03.jpg") no-repeat center center;
             background-size: cover;
             color: white;
             padding: 96px 48px;
@@ -72,16 +72,17 @@
             height: 100%;
         }
         .M_MainStat_Number{
-            font-size: 288px;
+            font-size: 80px;
             font-weight: 800;
             line-height: 85%;
-            letter-spacing: -20.16px;
+            letter-spacing: -3.2px;
+            color: #FFFFFF;
         }
         .M_MainStat_Text{
-            font-size: 140px;
-            font-weight: 800;
+            font-size: 48px;
+            font-weight: 600;
             line-height: 85%;
-            letter-spacing: -8.4px;
+            letter-spacing: -1.9px;
         }
         .A_Descriptor{
             display: flex;
@@ -89,8 +90,30 @@
             align-items: center;
             justify-content: flex-start;
             height: 300px;
-            text-align: center;
             font-size: 36px;
+            text-align: center;
+        }
+        .C_Dots{
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            height: fit-content;
+            width: 100%;
+        }
+        .A_Dot{
+            width: 12px;
+            height: 12px;
+            border-radius: 100%;
+            background-color: #FFFFFF;
+        }
+        .C_Dots_Container{
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
         }
     </style>
 </head>
@@ -100,11 +123,47 @@
             <div class="A_Descriptor">
             </div>
             <div class="M_MainStat">
-                <p class="M_MainStat_Number">{{totalLikes}}</p>
-                <p class="M_MainStat_Text">{{likesWord}}</p>
+                <p class="M_MainStat_Number">Кто-то</p>
+                <div class="C_Dots">
+                    <div class="A_Dot"></div>
+                    <div class="A_Dot"></div>
+                    <div class="A_Dot"></div>
+                </div>
+                <p class="M_MainStat_Text">делал презентации</p>
+                <div class="C_Dots_Container">
+                <div class="C_Dots">
+                    <div class="A_Dot"></div>
+                    <div class="A_Dot"></div>
+                    <div class="A_Dot"></div>
+                </div>
+                <div class="C_Dots">
+                    <div class="A_Dot"></div>
+                    <div class="A_Dot"></div>
+                    <div class="A_Dot"></div>
+                </div>
+                </div>
+                <p class="M_MainStat_Text">делал магию</p>
+                <div class="C_Dots_Container">
+                    <div class="C_Dots">
+                        <div class="A_Dot"></div>
+                        <div class="A_Dot"></div>
+                        <div class="A_Dot"></div>
+                    </div>
+                    <div class="C_Dots">
+                        <div class="A_Dot"></div>
+                        <div class="A_Dot"></div>
+                        <div class="A_Dot"></div>
+                    </div>
+                    <div class="C_Dots">
+                        <div class="A_Dot"></div>
+                        <div class="A_Dot"></div>
+                        <div class="A_Dot"></div>
+                    </div>
+                </div>
+                <p class="M_MainStat_Text">просто выжил</p>
             </div>
             <div class="A_Descriptor">
-                на всех твоих проектах<br>в новом портфолио
+            {{studentName}},<br> вот твои персональные итоги портфолио
             </div>
         </div>
     <div class="O_Footer">

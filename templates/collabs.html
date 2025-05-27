@@ -23,7 +23,7 @@
             max-height: 1920px;
             height: 1920px;
             overflow: hidden;
-            background: url("https://mattee.ru/images/BG/Q_BG02.jpg") no-repeat center center;
+            background: url("https://mattee.ru/images/NEWBG/Q_BGP02.jpg") no-repeat center center;
             background-size: cover;
             color: white;
             padding: 96px 48px;
@@ -80,7 +80,7 @@
         .M_MainStat_Text{
             font-size: 140px;
             font-weight: 800;
-            line-height: 1.1;
+            line-height: 85%;
             letter-spacing: -8.4px;
         }
         .A_Descriptor{
@@ -88,8 +88,15 @@
             flex-direction: column;
             align-items: center;
             justify-content: flex-start;
-            height: 180px;
+            gap: 12px;
+            height: 300px;
             font-size: 36px;
+        }
+        .U_Teammates{
+            text-align: center;
+        }
+        .U_Last {
+            color: #6E6E6E;
         }
     </style>
 </head>
@@ -100,9 +107,9 @@
             </div>
             <div class="M_MainStat">
                 <p class="M_MainStat_Number">{{totalCollabs}}</p>
-                <p class="M_MainStat_Text">коллабов</p>
+                <p class="M_MainStat_Text">{{collabsWord}}</p>
             </div>
-            <div class="A_Descriptor">
+            <div class="A_Descriptor U_Teammates">
                {{teammatesList}}
             </div>
         </div>

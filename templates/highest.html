@@ -23,8 +23,8 @@
             max-height: 1920px;
             height: 1920px;
             overflow: hidden;
-            background: url("https://mattee.ru/images/NEWBG/Q_BGP03.jpg") no-repeat center center;
-            background-size: cover;
+            background: url("https://mattee.ru/images/NEWBG/Q_BGG01.jpg") no-repeat center center;
+            background-size: fill;
             color: white;
             padding: 96px 48px;
         }  
@@ -81,6 +81,8 @@
             font-size: 140px;
             font-weight: 800;
             line-height: 85%;
+            max-height: 119px;
+            text-align: center;
             letter-spacing: -8.4px;
         }
         .A_Descriptor{
@@ -100,11 +102,13 @@
             <div class="A_Descriptor">
             </div>
             <div class="M_MainStat">
-                <p class="M_MainStat_Number">{{totalLikes}}</p>
-                <p class="M_MainStat_Text">{{likesWord}}</p>
+                <p class="M_MainStat_Number">{{highestMark}}</p>
+                <p class="M_MainStat_Text">твоя лучшая оценка</p>
             </div>
             <div class="A_Descriptor">
-                на всех твоих проектах<br>в новом портфолио
+                10 баллов: {{count10}} ({{percent10}}%)<br>
+                9 баллов: {{count9}} ({{percent9}}%)<br>
+                8 баллов: {{count8}} ({{percent8}}%)
             </div>
         </div>
     <div class="O_Footer">

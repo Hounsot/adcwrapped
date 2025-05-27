@@ -5,6 +5,31 @@ class PortfolioParser {
   constructor() {
     this.baseUrl = 'https://portfolio.hse.ru';
     this.apiUrl = 'https://api.mediiia.ru/qualities/api/LikeStatistics/GetByEntity';
+    this.viewsApiUrl = 'https://api.mediiia.ru/qualities/api/View/UpdateView';
+    this.browser = null;
+  }
+
+  /**
+   * Инициализирует браузер для парсинга просмотров
+   */
+  async initBrowser() {
+    if (!this.browser) {
+      const puppeteer = require('puppeteer');
+      this.browser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+      });
+    }
+  }
+
+  /**
+   * Закрывает браузер
+   */
+  async closeBrowser() {
+    if (this.browser) {
+      await this.browser.close();
+      this.browser = null;
+    }
   }
 
   /**
@@ -116,6 +141,123 @@ class PortfolioParser {
   }
 
   /**
+   * Получает количество просмотров проекта через API
+   * @param {string} hseDesignId - ID проекта в HseDesign
+   * @param {string} hseDesignUrl - URL проекта (для fallback метода при ошибке)
+   * @returns {Promise<number>} Количество просмотров
+   */
+  async getHseDesignViewsAPI(hseDesignId, hseDesignUrl = null) {
+    try {
+      console.log(`Получаю просмотры через API для проекта ${hseDesignId}...`);
+      
+      // Правильная структура запроса (найдена экспериментально!)
+      const requestData = {
+        entityId: hseDesignId,
+        entityType: "project",
+        context: "hsedesign"
+      };
+      
+      const response = await axios.post(this.viewsApiUrl, requestData, {
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'application/json, text/plain, */*',
+          'Accept-Language': 'ru-RU,ru;q=0.9,en;q=0.8',
+          'Origin': 'https://hsedesign.ru',
+          'Referer': 'https://hsedesign.ru/',
+          'Application-Context': 'hsedesign'  // Критически важный заголовок!
+        }
+      });
+      
+      if (response.data && typeof response.data.count === 'number') {
+        const views = response.data.count;
+        console.log(`✅ Найдено просмотров через API: ${views}`);
+        return views;
+      }
+      
+      console.log('API не вернул данные о просмотрах');
+      return 0;
+    } catch (error) {
+      console.error(`❌ Ошибка при получении просмотров через API для ${hseDesignId}:`, error.message);
+      
+      // Fallback на браузерный метод, если есть URL
+      if (hseDesignUrl) {
+        console.log('Используем fallback метод через браузер');
+        try {
+          return await this.getHseDesignViews(hseDesignUrl);
+        } catch (fallbackError) {
+          console.error('Fallback метод также не сработал:', fallbackError.message);
+        }
+      }
+      
+      return 0;
+    }
+  }
+
+  /**
+   * Получает количество просмотров проекта с HseDesign страницы
+   * @param {string} hseDesignUrl - URL проекта в HseDesign
+   * @returns {Promise<number>} Количество просмотров
+   */
+  async getHseDesignViews(hseDesignUrl) {
+    try {
+      console.log(`Получаю просмотры для ${hseDesignUrl}...`);
+      
+      // Инициализируем браузер если нужно
+      await this.initBrowser();
+      
+      const page = await this.browser.newPage();
+      
+      try {
+        // Устанавливаем User-Agent
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+        
+        // Переходим на страницу с коротким таймаутом
+        await page.goto(hseDesignUrl, { 
+          waitUntil: 'networkidle0',
+          timeout: 10000 
+        });
+        
+        // Дополнительная задержка для загрузки JS
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Ждем загрузки элемента с просмотрами (короткий таймаут)
+        await page.waitForSelector('.view-count-text', { timeout: 3000 });
+        
+        // Получаем текст из элемента
+        const viewsText = await page.$eval('.view-count-text', el => el.textContent.trim());
+        
+        if (viewsText) {
+          // Парсим число из текста (может быть в формате "377", "1.2к", "2.9к" и т.д.)
+          let views = 0;
+          if (viewsText.includes('к')) {
+            // Если в формате "2.9к"
+            const number = parseFloat(viewsText.replace('к', ''));
+            views = Math.round(number * 1000);
+          } else if (viewsText.includes('м')) {
+            // Если в формате "1.2м"
+            const number = parseFloat(viewsText.replace('м', ''));
+            views = Math.round(number * 1000000);
+          } else {
+            // Обычное число
+            views = parseInt(viewsText.replace(/\s/g, '')) || 0;
+          }
+          
+          console.log(`Найдено просмотров: ${views} (текст: "${viewsText}")`);
+          return views;
+        }
+        
+        return 0;
+      } finally {
+        await page.close();
+      }
+    } catch (error) {
+      console.error(`Ошибка при получении просмотров для ${hseDesignUrl}:`, error.message);
+      return 0;
+    }
+  }
+
+  /**
    * Основная функция для сбора всех данных о студенте
    * @param {string} portfolioUrl - Ссылка на портфолио студента
    * @returns {Promise<Object>} Полные данные о студенте и его проектах
@@ -174,6 +316,16 @@ class PortfolioParser {
             projectInfo.hseDesignLikes = likesData.totalLikes;
             projectInfo.likesBreakdown = likesData;
           }
+          
+          // Получаем количество просмотров через API
+          const hseDesignViews = await this.getHseDesignViewsAPI(projectDetails.hseDesignId, projectDetails.hseDesignUrl);
+          projectInfo.hseDesignViews = hseDesignViews;
+          
+          // Обновляем общее количество просмотров (портфолио + HseDesign)
+          projectInfo.views = (project.views || 0) + hseDesignViews;
+          
+          // Небольшая задержка после получения просмотров
+          await new Promise(resolve => setTimeout(resolve, 1000));
         }
         
         enrichedProjects.push(projectInfo);
@@ -201,6 +353,9 @@ class PortfolioParser {
     } catch (error) {
       console.error('Ошибка при парсинге данных студента:', error.message);
       throw error;
+    } finally {
+      // Закрываем браузер после завершения парсинга
+      await this.closeBrowser();
     }
   }
 

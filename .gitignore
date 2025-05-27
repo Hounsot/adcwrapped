@@ -19,6 +19,11 @@ logs
 .tmp/
 temp/
 
+# Сгенерированные изображения
+assets/generated/*.png
+assets/generated/*.jpg
+assets/generated/*.jpeg
+
 # Кэш
 .cache/
 .npm/
@@ -27,6 +32,16 @@ temp/
 # Данные тестирования
 student_data.json
 test_results/
+
+# Данные пользователей и логи
+data/
+users.json
+logs/
+
+# Файлы сервера
+*.pid
+*.seed
+*.pid.lock
 
 # IDE файлы
 .vscode/
