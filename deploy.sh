@@ -111,7 +111,14 @@ print_status "Сохраняем конфигурацию PM2..."
 pm2 save
 
 print_status "Настраиваем автозапуск PM2..."
-pm2 startup
+# Генерируем команду автозапуска и выполняем её
+STARTUP_CMD=$(pm2 startup | grep "sudo env" | head -1)
+if [ ! -z "$STARTUP_CMD" ]; then
+    print_status "Выполняем команду автозапуска..."
+    eval $STARTUP_CMD
+else
+    print_warning "Автозапуск уже настроен или команда не найдена"
+fi
 
 print_status "Показываем статус..."
 pm2 status

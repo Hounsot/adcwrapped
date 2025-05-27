@@ -42,25 +42,25 @@ bot.onText(/\/start/, async (msg) => {
 Убедись, что твоя ссылка выглядит именно так!
     `;
     
-    // Путь к GIF файлу
-    const gifPath = path.join(__dirname, 'assets', 'images', 'welcome.gif');
+    // Путь к MP4 файлу
+    const videoPath = path.join(__dirname, 'assets', 'images', 'welcome.mp4');
     
     try {
         // Проверяем, существует ли файл
-        if (fs.existsSync(gifPath)) {
-            // Отправляем GIF с подписью
-            await bot.sendAnimation(chatId, fs.createReadStream(gifPath), {
+        if (fs.existsSync(videoPath)) {
+            // Отправляем MP4 видео с подписью
+            await bot.sendVideo(chatId, fs.createReadStream(videoPath), {
                 caption: welcomeMessage,
-                filename: 'welcome.gif',
-                contentType: 'image/gif'
+                filename: 'welcome.mp4',
+                contentType: 'video/mp4'
             });
         } else {
             // Если файла нет, отправляем обычное сообщение
-            console.log('GIF файл не найден, отправляю текстовое сообщение');
+            console.log('MP4 файл не найден, отправляю текстовое сообщение');
             bot.sendMessage(chatId, welcomeMessage);
         }
     } catch (error) {
-        console.error('Ошибка при отправке GIF:', error);
+        console.error('Ошибка при отправке MP4:', error);
         // В случае ошибки отправляем обычное сообщение
         bot.sendMessage(chatId, welcomeMessage);
     }
