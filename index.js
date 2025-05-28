@@ -12,7 +12,40 @@ const parser = new PortfolioParser();
 const imageGenerator = new ImageGenerator();
 const userLogger = new UserLogger();
 
+// Система очередей и ограничений
+const processingQueue = new Map(); // chatId -> timestamp
+const userCooldowns = new Map(); // chatId -> timestamp
+const MAX_CONCURRENT_REQUESTS = 3; // Максимум одновременных запросов
+const COOLDOWN_TIME = 30000; // 30 секунд между запросами от одного пользователя
+const REQUEST_TIMEOUT = 120000; // 2 минуты таймаут на обработку
 
+// Функция проверки, можно ли обработать запрос
+function canProcessRequest(chatId) {
+    // Проверяем кулдаун пользователя
+    const lastRequest = userCooldowns.get(chatId);
+    if (lastRequest && Date.now() - lastRequest < COOLDOWN_TIME) {
+        return { canProcess: false, reason: 'cooldown', timeLeft: Math.ceil((COOLDOWN_TIME - (Date.now() - lastRequest)) / 1000) };
+    }
+    
+    // Проверяем количество активных запросов
+    const activeRequests = processingQueue.size;
+    if (activeRequests >= MAX_CONCURRENT_REQUESTS) {
+        return { canProcess: false, reason: 'queue_full', queuePosition: activeRequests + 1 };
+    }
+    
+    return { canProcess: true };
+}
+
+// Функция добавления в очередь
+function addToQueue(chatId) {
+    processingQueue.set(chatId, Date.now());
+    userCooldowns.set(chatId, Date.now());
+}
+
+// Функция удаления из очереди
+function removeFromQueue(chatId) {
+    processingQueue.delete(chatId);
+}
 
 // Команда /start
 bot.onText(/\/start/, async (msg) => {
@@ -253,12 +286,46 @@ https://portfolio.hse.ru/Student/XXXXX
         return;
     }
     
+    // ПРОВЕРЯЕМ ОЧЕРЕДЬ И ОГРАНИЧЕНИЯ
+    const queueCheck = canProcessRequest(chatId);
+    if (!queueCheck.canProcess) {
+        if (queueCheck.reason === 'cooldown') {
+            await bot.sendMessage(chatId, `
+⏰ Подождите ${queueCheck.timeLeft} секунд перед следующим запросом.
+
+Это помогает боту работать стабильно для всех пользователей!
+            `);
+            return;
+        } else if (queueCheck.reason === 'queue_full') {
+            await bot.sendMessage(chatId, `
+🚦 Сейчас очень много запросов! 
+
+Вы в очереди на позиции ${queueCheck.queuePosition}. 
+Попробуйте через 1-2 минуты.
+            `);
+            return;
+        }
+    }
+    
+    // Добавляем в очередь
+    addToQueue(chatId);
+    
     // Отправляем сообщение о начале парсинга
     const processingMsg = await bot.sendMessage(chatId, `
 ⏳ Начинаю анализ вашего портфолио...
 
 Это может занять несколько минут. Пожалуйста, подождите!
     `);
+    
+    // Устанавливаем таймаут на обработку
+    const timeoutId = setTimeout(() => {
+        removeFromQueue(chatId);
+        bot.sendMessage(chatId, `
+⏰ Время обработки истекло!
+
+Попробуйте еще раз через минуту. Если проблема повторяется, возможно портфолио недоступно.
+        `);
+    }, REQUEST_TIMEOUT);
     
     try {
         // Логируем запрос портфолио
@@ -306,6 +373,7 @@ https://portfolio.hse.ru/Student/XXXXX
                     }
                 }
             }
+            return;
         }
         
         // Удаляем сообщение о процессе
@@ -396,6 +464,10 @@ https://portfolio.hse.ru/Student/XXXXX
 Попробуйте еще раз, отправив ссылку на портфолио!
             `);
         }
+    } finally {
+        // ОБЯЗАТЕЛЬНО удаляем из очереди и отменяем таймаут
+        clearTimeout(timeoutId);
+        removeFromQueue(chatId);
     }
 });
 
