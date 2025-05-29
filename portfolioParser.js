@@ -78,8 +78,8 @@ class PortfolioParser {
       const response = await axios.get(url);
       const $ = cheerio.load(response.data);
       
-      // Ищем ссылку на HseDesign в блоке work-tags
-      const hseDesignLink = $('.work-tags a[href*="hsedesign.ru"]').attr('href');
+      // Ищем ссылку на HseDesign в блоке work-tags (поддерживаем как .ru, так и .com)
+      const hseDesignLink = $('.work-tags a[href*="hsedesign"]').attr('href');
       
       if (hseDesignLink) {
         // Извлекаем ID проекта из ссылки HseDesign
@@ -108,7 +108,7 @@ class PortfolioParser {
    * @returns {string|null} ID проекта в HseDesign
    */
   extractHseDesignId(hseDesignUrl) {
-    const match = hseDesignUrl.match(/\/project\/([a-f0-9]+)/);
+    const match = hseDesignUrl.match(/\/project\/([a-f0-9]{32})/);
     return match ? match[1] : null;
   }
 
